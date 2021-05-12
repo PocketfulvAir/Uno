@@ -116,7 +116,7 @@ class GameState:
         self.board = Board(players)
     
     def end_turn(self):
-        pass 
+        self.turn = self.turn + 1 if self.turn < self.board.num_active_players() - 1 else 0
 
     def draw(self):
         card = self.board.deck.draw_card()
@@ -136,9 +136,18 @@ class GameState:
 
 if __name__ == '__main__':
     state = GameState()
+    board = state.board
     #state.print_state()
     print(state.turn)
     state.init_draw()
-    print(state.board.deck.decksize())
-    for player in state.board.players:
-        print(player.name + ": "+ player.show_hand())
+    print(board.deck.decksize())
+    power = 1
+    while power:
+        for player in board.players:
+            print(player.name + ": "+ player.show_hand())
+        print(board.players[state.turn].name + "'s turn")
+        
+        action = input("Enter action: ")
+        state.end_turn()
+        if action == "e":
+            power = 0
