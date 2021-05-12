@@ -76,10 +76,22 @@ class Player:
         self.cards = []
 
     def add_card(self, card):
+        '''
+        Add card to player's hand
+        '''
         self.cards.append(card)
 
-    def play(self, card):
-        self.cards.remove(card)
+    def play(self, card_index):
+        return self.cards.pop(card)
+    
+    def get_card(self, index):
+        return self.cards[index]
+
+    def hand_size(self):
+        return len(self.cards)
+
+    def wipe_hand(self):
+        self.cards.clear()
 
     def show_hand(self):
         hand = ''
@@ -93,27 +105,62 @@ class Board:
         self.players = players
         self.deck = Deck()
         self.ranking = []
+        self.active = {0,1,2,3}
 
-    def kick_player(self, player):
-        self.players.remove(player)
+    def reset_deck(self):
+        self.deck = Deck()
+
+    def kick_player(self, playernum):
+        self.active.remove(playernum)
         self.ranking.append(player)
 
+    def ingame(self, playernum):
+        if playernum in self.active:
+            return True
+        return False
+
     def num_active_players(self):
-        return len(self.players)
+        return len(self.active)
 
     def active_players(self):
         actives = ''
-        for player in self.players:
-            actives += player.name + " "
+        for playernum in self.active:
+            actives += self.players[playernum].name + " "
         return actives.strip()
 
+class Pile:
+    def __init__(self):
+        self.stack = []
+
+    def add(self, card):
+        self.stack.append(card)
+
+    def wipe(self):
+        self.stack.clear()
+
+    def scoop(self):
+        top = self.stack.pop()
+        output = self.stack
+        self.stack = top
+        return output
+
+    def top_card(self):
+        if len(self.stack) < 1:
+            print("this is somehow empty")
+            return "Nan"
+        return self.stack[-1]
+
 class GameState:
+    '''
+    Overmind. Maintains all objects states and controls actions taken.
+    '''
     def __init__(self):
         self.turn = random.randint(0,3)
         players = []
         for i in range(4):
             players.append(Player("Player " + str(i)))
         self.board = Board(players)
+        self.pile = Pile()
     
     def end_turn(self):
         self.turn = self.turn + 1 if self.turn < self.board.num_active_players() - 1 else 0
@@ -122,12 +169,37 @@ class GameState:
         card = self.board.deck.draw_card()
         self.board.players[self.turn].add_card(card)
 
+    def playable(self, card):
+        check_card = self.pile.top_card()
+        if card.val == check_card.val or card.suit == check_card.suit:
+            return True
+        return False
+
+    def all_playable(self):
+        cards = []
+        current_player = self.board.players[self.turn]
+        for i in range(current_player.hand_size()):
+            if self.playable(current_player.get_card(i)):
+                cards.append(i)
+        return cards
+
+    def play_card(self, card_index, player):
+        pass
+
     def init_draw(self):
         init_hand_size = 6
         for i in range(self.board.num_active_players()):
             for j in range(init_hand_size):
                 card = self.board.deck.draw_card()
                 self.board.players[i].add_card(card)
+    
+    def start_game(self):
+        for player in self.board.players:
+            player.wipe_hand()
+        self.board.reset_deck()
+        self.pile.wipe()
+        self.init_draw()
+        self.pile.add(self.board.deck.draw_card())
 
     def print_state(self):
         print("Players: ", self.board.active_players())
@@ -142,12 +214,27 @@ if __name__ == '__main__':
     state.init_draw()
     print(board.deck.decksize())
     power = 1
+    state.start_game()
+    for player in board.players:
+        print(player.name + ": "+ player.show_hand())
     while power:
-        for player in board.players:
-            print(player.name + ": "+ player.show_hand())
-        print(board.players[state.turn].name + "'s turn")
+        no_move = 1
+        current_player = board.players[state.turn]
+        print(current_player.name + ": "+ current_player.show_hand())
+        print(current_player.name + "'s turn")
+        print("Current Card: ", state.pile.top_card().value_abr())
+        playables = state.all_playable()
+        print("Playable Cards: ", playables)
+        print("Playable values: ", [current_player.cards[i].value_abr() for i in playables])
+        while no_move:
+            action = input("Enter action: ")
         
-        action = input("Enter action: ")
+            if action == "e":
+                power = 0
+            else:
+                try:
+                    choice = int(action)
+                except ValueError:
+                    print("Choice not an int")
+            no_move = 0              
         state.end_turn()
-        if action == "e":
-            power = 0
