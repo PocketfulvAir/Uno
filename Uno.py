@@ -82,7 +82,7 @@ class Player:
         self.cards.append(card)
 
     def play(self, card_index):
-        return self.cards.pop(card)
+        return self.cards.pop(card_index)
     
     def get_card(self, index):
         return self.cards[index]
@@ -105,28 +105,26 @@ class Board:
         self.players = players
         self.deck = Deck()
         self.ranking = []
-        self.active = {0,1,2,3}
+
+    def replace_w_ai(self, num_ai):
+        self.players = self.players[:-num_ai]
+        for i in range(num_ai):
+            self.players.append(AI("AI " + str(i)))
 
     def reset_deck(self):
         self.deck = Deck()
-
-    def kick_player(self, playernum):
-        self.active.remove(playernum)
-        self.ranking.append(player)
 
     def ingame(self, playernum):
         if playernum in self.active:
             return True
         return False
 
-    def num_active_players(self):
-        return len(self.active)
+    def num_players(self):
+        return len(self.players)
 
-    def active_players(self):
-        actives = ''
-        for playernum in self.active:
-            actives += self.players[playernum].name + " "
-        return actives.strip()
+class AI(Player):
+    def play_first_card(self):
+        pass
 
 class Pile:
     def __init__(self):
@@ -163,9 +161,10 @@ class GameState:
         self.pile = Pile()
     
     def end_turn(self):
-        self.turn = self.turn + 1 if self.turn < self.board.num_active_players() - 1 else 0
+        self.turn = self.turn + 1 if self.turn < self.board.num_players() - 1 else 0
 
     def draw(self):
+        #if self.board.deck.decksize() > 0
         card = self.board.deck.draw_card()
         self.board.players[self.turn].add_card(card)
 
@@ -183,43 +182,77 @@ class GameState:
                 cards.append(i)
         return cards
 
-    def play_card(self, card_index, player):
-        pass
+    def has_playable(self):
+        return len(self.all_playable()) > 0
+
+    def current_player(self):
+        return self.board.players[self.turn]
+
+    def play_card(self, card_index):
+        self.pile.add(self.current_player().play(card_index))
+        if self.current_player().hand_size == 0:
+            print(self.current_player().name + " has cleared their hand")
 
     def init_draw(self):
         init_hand_size = 6
-        for i in range(self.board.num_active_players()):
+        for i in range(self.board.num_players()):
             for j in range(init_hand_size):
                 card = self.board.deck.draw_card()
                 self.board.players[i].add_card(card)
     
-    def start_game(self):
+    def start_game(self, num_ai):
         for player in self.board.players:
             player.wipe_hand()
         self.board.reset_deck()
+        self.board.replace_w_ai(num_ai)
         self.pile.wipe()
         self.init_draw()
         self.pile.add(self.board.deck.draw_card())
+
 
     def print_state(self):
         print("Players: ", self.board.active_players())
         print("Deck: ")
         self.deck.show()
 
+    def print_visible_state(self):
+        current_player = self.current_player()
+        print(current_player.name + ": "+ current_player.show_hand())
+        print("Current Card: ", state.pile.top_card().value_abr()) 
+
+    def print_debug(self):
+        for player in self.board.players:
+            print(player.name + ": "+ player.show_hand())
+
+    def print_all_visible_state(self):
+        pass
+
+    def auto_play(self):
+        current_player = self.current_player()
+        if self.has_playable():
+            self.play_card(self.all_playable()[0])
+        
+
 if __name__ == '__main__':
     state = GameState()
     board = state.board
-    #state.print_state()
     print(state.turn)
     state.init_draw()
     print(board.deck.decksize())
     power = 1
-    state.start_game()
+    state.start_game(3)
     for player in board.players:
         print(player.name + ": "+ player.show_hand())
     while power:
         no_move = 1
-        current_player = board.players[state.turn]
+        current_player = state.current_player()
+        if current_player.hand_size() == 0:
+            state.end_turn()
+            continue
+        if isinstance(current_player,AI):
+            state.auto_play()
+            state.end_turn()
+            continue
         print(current_player.name + ": "+ current_player.show_hand())
         print(current_player.name + "'s turn")
         print("Current Card: ", state.pile.top_card().value_abr())
@@ -231,10 +264,23 @@ if __name__ == '__main__':
         
             if action == "e":
                 power = 0
+            elif action == "d":
+                state.print_visible_state()
+                continue
+            elif action == 'D':
+                state.print_debug()
+                continue
+            elif action == "p":
+                state.draw()
             else:
                 try:
                     choice = int(action)
                 except ValueError:
                     print("Choice not an int")
+                    continue
+                if choice not in playables:
+                    print("Cannot play card")
+                    continue
+                state.play_card(choice)
             no_move = 0              
         state.end_turn()
